@@ -35,14 +35,14 @@ let update x v s = fun y -> if x = y then v else s y
 (* An example of a non-trivial state: *)                                                   
 let s = update "x" 1 @@ update "y" 2 @@ update "z" 3 @@ update "t" 4 empty
 
-(* Some testing; comment this definition out when submitting the solution. *)
+(* Some testing; comment this definition out when submitting the solution. 
 let _ =
   List.iter
     (fun x ->
        try  Printf.printf "%s=%d\n" x @@ s x
        with Failure s -> Printf.printf "%s\n" s
     ) ["x"; "a"; "y"; "z"; "t"; "b"]
-
+*)
 (* Expression evaluator
 
      val eval : state -> expr -> int
@@ -50,5 +50,31 @@ let _ =
    Takes a state and an expression, and returns the value of the expression in 
    the given state.
 *)
-let eval = failwith "Not implemented yet"
+
+(* Implementation of casting functions *)
+let boolToNumber x = if x then 1 else 0
+let numberToBool x = if (x <> 0) then true else false
+
+(* Implementation of eval *)
+let rec eval state expr = 
+    match expr with
+    | Var x -> state x
+    | Const n -> n 
+    | Binop (op, l, r) -> 
+        let left = eval state l and right = eval state r in
+            match op with
+            | "+" -> left + right
+            | "-" -> left - right
+            | "*" -> left * right
+            | "/" -> left / right
+            | "%" -> left mod right
+            | "<" -> boolToNumber (left < right)
+            | "<=" -> boolToNumber (left <= right)
+            | ">" -> boolToNumber (left > right)
+            | ">=" -> boolToNumber (left >= right)
+            | "==" -> boolToNumber (left = right)
+            | "!=" -> boolToNumber (left <> right)
+            | "&&" -> boolToNumber (numberToBool left && numberToBool right)
+            | "!!" -> boolToNumber (numberToBool left || numberToBool right)
+            | _ -> failwith("Unknown operator!")
                     
