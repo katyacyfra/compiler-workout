@@ -22,8 +22,36 @@ type config = int list * Syntax.Stmt.config
      val eval : config -> prg -> config
 
    Takes a configuration and a program, and returns a configuration as a result
- *)                         
-let eval _ = failwith "Not yet implemented"
+ *)  
+ 
+let rec eval cfg prg = match prg with
+        | [] -> cfg
+        | p :: ps -> match p with
+            | BINOP binop -> (match cfg with
+                | (x :: y :: xs, (st, inp, out)) ->  eval (((Syntax.Expr.eval st (Binop (binop, Const x, Const y)))) :: xs, (st, inp, out)) ps
+                | _ -> failwith "eval BINOP failed!"
+			)
+			| CONST c -> (match cfg with
+                | (xs, stcfg) ->  eval (c :: xs, stcfg) ps
+                | _ -> failwith "eval CONST failed!"
+			)
+			| READ -> (match cfg with
+                | (xs, (st, i :: inp, out)) ->  eval (i :: xs, (st, inp, out)) ps
+                | _ -> failwith "eval READ failed!"
+			)
+			| WRITE -> (match cfg with
+                | (x :: xs, (st, inp, out)) ->  eval (xs, (st, inp, out @ [x])) ps
+                | _ -> failwith "eval WRITE failed!"
+			)
+			| LD var -> (match cfg with
+                | (xs, (st, inp, out)) ->  eval ((st var) :: xs, (st, inp, out)) ps
+                | _ -> failwith "eval LD failed!"
+			)
+			| ST var -> (match cfg with
+                | (x :: xs, (st, inp, out)) ->  eval (xs, ((Syntax.Expr.update var x st), inp, out)) ps
+                | _ -> failwith "eval LD failed!"
+			)
+			| _ -> failwith "eval unknown instruction!"
 
 (* Top-level evaluation
 
@@ -40,5 +68,16 @@ let run i p = let (_, (_, _, o)) = eval ([], (Syntax.Expr.empty, i, [])) p in o
    Takes a program in the source language and returns an equivalent program for the
    stack machine
  *)
+ 
+let rec compileHelper expr = 
+    match expr with
+        | Syntax.Expr.Var x -> [LD x]
+        | Syntax.Expr.Const n -> [CONST n]
+        | Syntax.Expr.Binop (op, l, r) -> compileHelper l @ compileHelper r @ [BINOP op]		
 
-let compile _ = failwith "Not yet implemented"
+let rec compile sttype = 
+    match sttype with
+	    | Syntax.Stmt.Read var -> [READ; ST var]
+        | Syntax.Stmt.Write expr -> compileHelper expr @ [WRITE]
+        | Syntax.Stmt.Assign (var, value) -> compileHelper value @ [ST var]
+        | Syntax.Stmt.Seq(firstst, secondst) -> compile firstst @ compile secondst
