@@ -41,34 +41,9 @@ module Expr =
        Takes a state and an expression, and returns the value of the expression in 
        the given state.
     *)
-    (* Implementation of casting functions *)
-    let boolToNumber x = if x then 1 else 0
-    let numberToBool x = if (x <> 0) then true else false
+    let eval _ = failwith "Not implemented yet"
 
-    (* Implementation of eval *)
-    let rec eval state expr = 
-        match expr with
-        | Var x -> state x
-        | Const n -> n 
-        | Binop (op, l, r) -> 
-            let left = eval state l and right = eval state r in
-                match op with
-                | "+" -> left + right
-                | "-" -> left - right
-                | "*" -> left * right
-                | "/" -> left / right
-                | "%" -> left mod right
-                | "<" -> boolToNumber (left < right)
-                | "<=" -> boolToNumber (left <= right)
-                | ">" -> boolToNumber (left > right)
-                | ">=" -> boolToNumber (left >= right)
-                | "==" -> boolToNumber (left = right)
-                | "!=" -> boolToNumber (left <> right)
-                | "&&" -> boolToNumber (numberToBool left && numberToBool right)
-                | "!!" -> boolToNumber (numberToBool left || numberToBool right)
-                | _ -> failwith("Unknown operator!")
-
-    end
+  end
                     
 (* Simple statements: syntax and sematics *)
 module Stmt =
@@ -90,15 +65,8 @@ module Stmt =
 
        Takes a configuration and a statement, and returns another configuration
     *)
-			
-	let rec eval (state, input, output) sttype =
-	    match sttype with
-		    | Read var -> (match input with
-			    | [] -> failwith "Empty input!"
-				| x :: xs -> ((Expr.update var x state), xs, output))
-			| Write expr -> (state, input, (Expr.eval state expr)::output)
-			| Assign(var, value) -> ((Expr.update var (Expr.eval state value) state), input, output)
-			| Seq(firstst, secondst) -> (eval (eval (state, input, output) firstst) secondst)                                                        
+    let eval _ = failwith "Not implemented yet"
+                                                         
   end
 
 (* The top-level definitions *)
