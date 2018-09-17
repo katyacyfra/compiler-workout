@@ -28,7 +28,7 @@ let rec eval cfg prg = match prg with
         | [] -> cfg
         | p :: ps -> match p with
             | BINOP binop -> (match cfg with
-                | (x :: y :: xs, (st, inp, out)) ->  eval (((Syntax.Expr.eval st (Binop (binop, Const x, Const y)))) :: xs, (st, inp, out)) ps
+                | (x :: y :: xs, (st, inp, out)) ->  eval (((Syntax.Expr.eval st (Binop (binop, Const y, Const x)))) :: xs, (st, inp, out)) ps
                 | _ -> failwith "eval BINOP failed!"
 			)
 			| CONST c -> (match cfg with
