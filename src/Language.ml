@@ -91,13 +91,13 @@ module Expr =
 					   ];
              `Lefta , [ostap ("&&"), (binOp "&&"); 
 					   ];
-		     `Nona  , [ostap ("<"), (binOp "<");
-			           ostap ("<="), (binOp "<=");
-					   ostap (">"), (binOp ">");
-			           ostap (">="), (binOp ">=")
+             `Nona  , [ostap ("<="), (binOp "<=");
+		       ostap (">="), (binOp ">=");
+		       ostap (">"), (binOp ">");
+		       ostap ("<"), (binOp "<")
 			          ];
              `Nona  , [ostap ("=="), (binOp "==");
-			           ostap ("!="), (binOp "!=")
+	               ostap ("!="), (binOp "!=")
 			          ];
              `Lefta , [ostap ("+"), (binOp "+"); 
 			           ostap ("-"), (binOp "-")
@@ -148,12 +148,11 @@ module Stmt =
     ostap (
       simple_stmt:
         x:IDENT ":=" e:!(Expr.expr)                    { Assign(x, e) }
-      | "read" -"(" x:IDENT -")"                       { Read x } 
-      | "write" -"(" e:!(Expr.expr) -")"               { Write e };         
+      | "read" "(" x:IDENT ")"                       { Read x } 
+      | "write" "(" e:!(Expr.expr) ")"               { Write e };         
 
       stmt: <s::ss> : !(Util.listBy)[ostap (";")][simple_stmt] {List.fold_left (fun s ss -> Seq (s, ss)) s ss};
-	  parse: stmt
-    )
+	  parse: stmt)
       
   end
 
