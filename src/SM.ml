@@ -1,5 +1,7 @@
 open GT       
 open Language
+open Language.Expr
+open Language.Stmt
        
 (* The type for the stack machine instructions *)
 @type insn =
@@ -24,7 +26,34 @@ type config = int list * Stmt.config
 
    Takes a configuration and a program, and returns a configuration as a result
 *)                         
-let rec eval conf prog = failwith "Not yet implemented"
+let rec eval cfg prg = match prg with
+        | [] -> cfg
+        | p :: ps -> match p with
+            | BINOP binop -> (match cfg with
+                | (x :: y :: xs, (st, inp, out)) ->  eval (((Language.Expr.eval st (Binop (binop, Const y, Const x)))) :: xs, (st, inp, out)) ps
+                | _ -> failwith "eval BINOP failed!"
+			)
+			| CONST c -> (match cfg with
+                | (xs, stcfg) ->  eval (c :: xs, stcfg) ps
+                | _ -> failwith "eval CONST failed!"
+			)
+			| READ -> (match cfg with
+                | (xs, (st, i :: inp, out)) ->  eval (i :: xs, (st, inp, out)) ps
+                | _ -> failwith "eval READ failed!"
+			)
+			| WRITE -> (match cfg with
+                | (x :: xs, (st, inp, out)) ->  eval (xs, (st, inp, out @ [x])) ps
+                | _ -> failwith "eval WRITE failed!"
+			)
+			| LD var -> (match cfg with
+                | (xs, (st, inp, out)) ->  eval ((st var) :: xs, (st, inp, out)) ps
+                | _ -> failwith "eval LD failed!"
+			)
+			| ST var -> (match cfg with
+                | (x :: xs, (st, inp, out)) ->  eval (xs, ((Language.Expr.update var x st), inp, out)) ps
+                | _ -> failwith "eval LD failed!"
+			)
+       | _ -> failwith "eval unknown instruction!"
 
 (* Top-level evaluation
 
