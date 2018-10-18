@@ -86,7 +86,84 @@ open SM
    Take an environment, a stack machine program, and returns a pair --- the updated environment and the list
    of x86 instructions
 *)
-let compile _ = failwith "Not Implemented Yet"
+let suffix = function
+    | "<"  -> "l"
+    | "<=" -> "le"
+    | "==" -> "e"
+    | "!=" -> "ne"
+    | ">=" -> "ge"
+    | ">"  -> "g"
+    | _    ->  failwith "unknown operator"
+
+let rec compile env code = 
+    let onstack = function | S _ -> true | _ -> false in
+        match code with
+            | [] -> env, []
+            | instr :: scode' ->
+            let env, code' = 
+			   match instr with
+                | CONST n -> let s, env = env#allocate in
+                    (env, [Mov (L n, s)])
+                | LD x -> let s, env = (env#global x)#allocate in
+                    env, (match s with
+                            | M _ | S _ -> [Mov (M (env#loc x), eax); Mov (eax, s)]
+                            | _         -> [Mov (M (env#loc x), s)]
+							)
+                | ST x -> let s, env = (env#global x)#pop in
+                    env, [Mov (s, M (env#loc x))]
+                | READ -> let s, env = env#allocate in
+                    env, [Call "Lread"; Mov (eax, s)]
+                | WRITE -> let s, env = env#pop in
+                    env, [Push s; Call "Lwrite"; Pop eax]
+				| LABEL l -> env, [Label l]	
+				| JMP l   -> env, [Jmp l]
+				| CJMP (c, l) -> let m, env = env#pop in 
+				    env, [Binop ("cmp", L 0, m); CJmp (c, l)]
+                | BINOP op -> 
+                    let x, y, env = env#pop2 in
+                    env#push y,
+                    (match op with
+                    | "+" | "-" | "*" -> 
+					    if onstack y
+                            then [Mov (y, eax); Binop (op, x, eax); Mov (eax, y)]
+                            else [Binop (op, x, y)]
+                    | "/" | "%" -> 
+                         [Mov (y, eax);
+                          Cltd; 
+                          IDiv x; 
+						  Mov ((match op with
+                              | "/" -> eax
+							  |  _ -> edx
+						  ), y)
+						  ]
+                    | "<=" | "<" | ">=" | ">" | "==" | "!=" -> 
+                       [Binop("^", eax, eax);
+                        Mov (x, edx);
+                        Binop ("cmp", edx, y);
+                        Set(suffix op, "%al" );
+						Mov (eax, y)
+                        ]
+                    | "!!" -> 
+                       [Mov (y, eax);
+                        Binop (op, x, eax);
+						Mov (L 0, eax);
+                        Set ("ne", "%al");
+                        Mov (eax, y)
+                        ]
+                    | "&&" -> 
+                        [Binop("^", eax, eax);
+					    Binop("cmp", eax, x);
+                        Set ("ne", "%al");
+						Binop("^", edx, edx);
+						Binop("cmp", edx, y);
+						Set ("ne", "%dl");
+						Binop("&&", eax, edx);
+						Mov (edx, y)
+                        ]
+					| _    -> failwith "Not implemented"
+				    )
+        in let env', code'' = compile env scode'
+            in env', code' @ code''
 
 (* A set of strings *)           
 module S = Set.Make (String)

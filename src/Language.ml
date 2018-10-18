@@ -5,6 +5,7 @@ open GT
 
 (* Opening a library for combinator-based syntax analysis *)
 open Ostap.Combinators
+open Ostap
 
 (* States *)
 module State =
@@ -119,6 +120,10 @@ module Expr =
     )
     
   end
+  
+  let default x opt = match opt with
+        | Some v -> v
+        | None   -> x	
                     
 (* Simple statements: syntax and sematics *)
 module Stmt =
@@ -133,7 +138,7 @@ module Stmt =
     (* empty statement                  *) | Skip
     (* conditional                      *) | If     of Expr.t * t * t
     (* loop with a pre-condition        *) | While  of Expr.t * t
-    (* loop with a post-condition       *) | Repeat of t * Expr.t
+    (* loop with a post-condition       *) | Until  of Expr.t * t
     (* call a procedure                 *) | Call   of string * Expr.t list with show
                                                                     
     (* The type of configuration: a state, an input stream, an output stream *)
@@ -150,12 +155,60 @@ module Stmt =
 
        which returns a list of formal parameters and a body for given definition
     *)
-    let rec eval _ = failwith "Not Implemented Yet"
+ 
+ 	let rec argsHelperAssign vs xs st = match (vs, xs) with
+      | ([], [])           -> st
+      | (v :: vs, x :: xs) -> argsHelperAssign vs xs (State.update x v st)
+	
+	
+    	let rec eval env (state, input, output) sttype =
+	    match sttype with
+		    | Read var -> (match input with
+			    | [] -> failwith "Empty input!"
+				| x :: xs -> ((State.update var x state), xs, output))
+			| Write expr -> (state, input, output @ [(Expr.eval state expr)])
+			| Assign(var, value) -> ((State.update var (Expr.eval state value) state), input, output)
+            | Seq(firstst, secondst) -> (eval env (eval env (state, input, output) firstst) secondst)
+			| If(cond, tr, fl) -> if (Expr.eval state cond <> 0) then eval env (state, input, output) tr else eval env (state, input, output) fl
+			| While(cond, st) -> if (Expr.eval state cond <> 0) then eval env (eval env (state, input, output) st) (While (cond, st)) else (state, input, output)
+            | Until (cond, st) -> let (s, i, o) = eval env (state, input, output) st in if (Expr.eval s cond <> 0) then (s, i, o) else eval env (s, i, o) (Until (cond, st))  
+			| Skip -> (state, input, output)
+			| Call(name, args) -> let (arguments, locals, body) = env#definition name in
+			                      let values = List.combine arguments (List.map (Expr.eval state) args) in
+								  let newst = State.push_scope state (arguments @ locals) in
+                                  let newst' = List.fold_left (fun state (var, vall) -> State.update var vall state) newst values in
+                                  let newst'', ni, no = eval env (newst', input, output) body
+                                  in (State.drop_scope newst'' state, ni, no)
+
+	                      
                                 
     (* Statement parser *)
-    ostap (                                      
-      parse: empty {failwith "Not yet implemented"}
-    )
+    ostap (
+      simple_stmt:
+        x:IDENT ":=" e:!(Expr.parse)                                               { Assign(x, e) }
+      | "read" "(" x:IDENT ")"                                                     { Read x } 
+      | "write" "(" e:!(Expr.parse) ")"                                            { Write e }   
+	  | "skip"                                                                     { Skip }
+	  | "while" c:!(Expr.parse) "do" st:stmt "od"                                  { While(c, st) }
+	  | "for" init:stmt "," c:!(Expr.parse) "," incr:stmt "do" st:stmt "od"        { Seq (init, While(c, Seq(st, incr))) }
+	  | "repeat" st:stmt "until" c:!(Expr.parse)                                   { Until (c, st) }
+	  | "if" c:!(Expr.parse) "then" tr:stmt "elif" elif:elseif "fi"                { If (c, tr, elif) }
+      | "if" c:!(Expr.parse) "then" tr:stmt "else" fl:stmt "fi"                    { If (c, tr, fl) }
+      | "if" c:!(Expr.parse) "then" tr:stmt "fi"                                   { If (c, tr, Skip) }
+	  | funcName:IDENT "(" args:(!(Util.list)[ostap (!(Expr.parse))])? ")"         { Call (funcName, default [] args)}; 
+	  
+	  arguments: 
+        a:!(Expr.parse)                                                            { a :: [] }
+      | a:!(Expr.parse) -"," ax:!(arguments)                                       { a :: ax };
+	  
+	  elseif: 
+	  	c:!(Expr.parse) "then" tr:stmt "elif" elif:elseif                          { If (c, tr, elif) }
+      | c:!(Expr.parse) "then" tr:stmt "else" fl:stmt                              { If (c, tr, fl) }
+      | c:!(Expr.parse) "then" tr:stmt                                             { If (c, tr, Skip) };
+
+
+      stmt: <s::ss> : !(Util.listBy)[ostap (";")][simple_stmt] {List.fold_left (fun s ss -> Seq (s, ss)) s ss};
+      parse: stmt)
       
   end
 
@@ -167,7 +220,9 @@ module Definition =
     type t = string * (string list * string list * Stmt.t)
 
     ostap (                                      
-      parse: empty {failwith "Not yet implemented"}
+      parse: 
+        -"fun" funcName:IDENT -"(" args:(!(Util.list)[ostap (IDENT)])? -")" localVars:(-"local" !(Util.list)[ostap (IDENT)])? -"{" body:!(Stmt.parse) -"}"
+        {(funcName, (default [] args, default [] localVars, body))}
     )
 
   end
